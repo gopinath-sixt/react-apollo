@@ -1,6 +1,6 @@
 import ApolloClient, { PureQueryOptions, ApolloError } from 'apollo-client';
-import { MutationProps, MutationContext, MutationOptions, ExecutionResult } from '../Mutation';
-import { OperationVariables } from '../types';
+import { MutationContext, MutationOptions, ExecutionResult, MutationUpdaterFn } from '../Mutation';
+import { OperationVariables, RefetchQueriesProviderFn } from '../types';
 import { getClient } from '../component-utils';
 import { DocumentNode } from 'graphql';
 import { parser, DocumentType } from '../parser';
@@ -13,13 +13,40 @@ const initialState = {
   data: undefined,
 };
 
+export interface MutateResult {
+  called: boolean;
+  loading: boolean;
+  data: any;
+  error: ApolloError;
+  client: ApolloClient<Object>;
+}
+
+export type MutationRunner = (options?: MutationOptions<any, any>) => Promise<any>;
+
+export interface MutationProps<TData = any, TVariables = OperationVariables> {
+  client?: ApolloClient<Object>;
+  mutation: DocumentNode;
+  ignoreResults?: boolean;
+  optimisticResponse?: TData;
+  variables?: TVariables;
+  refetchQueries?: Array<string | PureQueryOptions> | RefetchQueriesProviderFn;
+  awaitRefetchQueries?: boolean;
+  update?: MutationUpdaterFn<TData>;
+  onCompleted?: (data: TData) => void;
+  onError?: (error: ApolloError) => void;
+  context?: Record<string, any>;
+}
+
 class Mutation<TData = any, TVariables = OperationVariables> {
   private client: ApolloClient<any>;
   private mostRecentMutationId: number;
   private state: any;
   private hasMounted: boolean = false;
 
-  constructor(public props: MutationProps<TData, TVariables>, public context: MutationContext) {
+  constructor(
+    protected props: MutationProps<TData, TVariables>,
+    protected context: MutationContext,
+  ) {
     this.props = props;
     this.context = context;
     this.client = getClient(props, context);
@@ -50,17 +77,16 @@ class Mutation<TData = any, TVariables = OperationVariables> {
 
   // render
   // use by hook
-  api() {
+  api(): [MutateResult, MutationRunner] {
     const { loading, data, error, called } = this.state;
-
-    return {
+    const result = {
       called,
       loading,
       data,
       error,
       client: this.client,
-      runMutation: this.runMutation,
     };
+    return [result, this.runMutation];
   }
 
   private runMutation = (options: MutationOptions<TData, TVariables> = {}) => {

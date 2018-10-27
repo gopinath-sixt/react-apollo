@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import Mutation from './Mutation';
 import { OperationVariables } from '../types';
-import { MutationProps, MutationContext } from '../Mutation';
+import { MutationContext } from '../Mutation';
+import { MutationProps } from './Mutation';
 
 export function useMutation(
   props: MutationProps<any, OperationVariables>,

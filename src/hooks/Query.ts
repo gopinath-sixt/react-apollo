@@ -9,10 +9,30 @@ import { ZenObservable } from 'zen-observable-ts';
 import { OperationVariables, GraphqlQueryControls } from '../types';
 import { parser, DocumentType, IDocumentDefinition } from '../parser';
 import { getClient } from '../component-utils';
-import { QueryContext, QueryProps, QueryResult, ObservableQueryFields } from '../Query';
+import { QueryContext, QueryResult, ObservableQueryFields } from '../Query';
+
+import { FetchPolicy, ErrorPolicy } from 'apollo-client';
+import { DocumentNode } from 'graphql';
 
 const shallowEqual = require('fbjs/lib/shallowEqual');
 const invariant = require('invariant');
+
+export interface QueryProps<TData = any, TVariables = OperationVariables> {
+  fetchPolicy?: FetchPolicy;
+  errorPolicy?: ErrorPolicy;
+  notifyOnNetworkStatusChange?: boolean;
+  pollInterval?: number;
+  query: DocumentNode;
+  variables?: TVariables;
+  ssr?: boolean;
+  displayName?: string;
+  skip?: boolean;
+  client?: ApolloClient<Object>;
+  context?: Record<string, any>;
+  partialRefetch?: boolean;
+  onCompleted?: (data: TData | {}) => void;
+  onError?: (error: ApolloError) => void;
+}
 
 export function compact(obj: any) {
   return Object.keys(obj).reduce(
@@ -64,7 +84,7 @@ export default class Query<TData = any, TVariables = OperationVariables> {
   private hasMounted: boolean = false;
   private operation?: IDocumentDefinition;
 
-  constructor(protected props: QueryProps<TData, TVariables>, context: QueryContext) {
+  constructor(protected props: QueryProps<TData, TVariables>, context: QueryContext = {}) {
     this.context = context;
     this.client = getClient(props, context);
     this.initializeQueryObservable(props);

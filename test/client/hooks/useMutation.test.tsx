@@ -1,5 +1,4 @@
-import * as React  from 'react';
-import { useContext } from 'react';
+import * as React from 'react';
 import { mount } from 'enzyme';
 import gql from 'graphql-tag';
 import { ApolloClient, ApolloError } from 'apollo-client';
@@ -7,7 +6,7 @@ import { InMemoryCache as Cache } from 'apollo-cache-inmemory';
 import { DataProxy } from 'apollo-cache';
 import { ExecutionResult, GraphQLError } from 'graphql';
 
-import { useMutation, useQuery } from '../../../src/hooks';
+import { useMutation, useProvider } from '../../../src/hooks';
 import { MockedProvider, MockLink, mockSingleLink } from '../../../src/test-utils';
 
 import stripSymbols from '../../test-utils/stripSymbols';
@@ -114,11 +113,9 @@ it('pick prop client over context client', async done => {
   const spy = jest.fn();
 
   const Component = (props: any) => {
-    const apollo = useContext(ApolloContext)
-    const mutate = useMutation({ client: propsClient, mutation });
-    return (
-        <button onClick={() => mutate.createTodo().then(spy)} />}
-    );
+    const context = useProvider({ client: contextClient, ...props }, {});
+    const [_, createTodo] = useMutation({ client: propsClient, mutation }, mutation);
+    return <button onClick={() => createTodo().then(spy)} />;
   };
 
   const wrapper = mount(<Component />);

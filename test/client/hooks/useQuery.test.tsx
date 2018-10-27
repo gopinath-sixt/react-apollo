@@ -2,10 +2,10 @@ import * as React from 'react';
 import ApolloClient, { ApolloError, NetworkStatus } from 'apollo-client';
 import { mount, ReactWrapper } from 'enzyme';
 import { InMemoryCache as Cache } from 'apollo-cache-inmemory';
-import { ApolloProvider, Query } from '../../src';
-import { MockedProvider, mockSingleLink } from '../../src/test-utils';
-import catchAsyncError from '../test-utils/catchAsyncError';
-import stripSymbols from '../test-utils/stripSymbols';
+import { useProvider, useQuery } from '../../../src/hooks';
+import { MockedProvider, mockSingleLink } from '../../../src/test-utils';
+import catchAsyncError from '../../test-utils/catchAsyncError';
+import stripSymbols from '../../test-utils/stripSymbols';
 import { DocumentNode } from 'graphql';
 import gql from 'graphql-tag';
 
@@ -35,8 +35,6 @@ const allPeopleMocks = [
   },
 ];
 
-class AllPeopleQuery extends Query<Data, { first: number }> {}
-
 describe('Query component', () => {
   let wrapper: ReactWrapper<any, any> | null;
   beforeEach(() => {
@@ -60,35 +58,32 @@ describe('Query component', () => {
       cache: new Cache({ addTypename: false }),
     });
 
-    const Component = () => (
-      <Query query={allPeopleQuery}>
-        {result => {
-          catchAsyncError(done, () => {
-            const { client: clientResult, ...rest } = result;
+    const Component = (props: any) => {
+      const result = useQuery({ query: allPeopleQuery, ...props }, {});
 
-            if (result.loading) {
-              expect(rest).toMatchSnapshot('result in render prop while loading');
-              expect(clientResult).toBe(client);
-            } else {
-              expect(stripSymbols(rest)).toMatchSnapshot('result in render prop');
-              done();
-            }
-          });
+      catchAsyncError(done, () => {
+        const { client: clientResult, ...rest } = result;
 
-          return null;
-        }}
-      </Query>
-    );
+        if (result.loading) {
+          expect(rest).toMatchSnapshot('result in render prop while loading');
+          expect(clientResult).toBe(client);
+        } else {
+          expect(stripSymbols(rest)).toMatchSnapshot('result in render prop');
+          done();
+        }
+      });
+      return null;
+    };
 
-    wrapper = mount(
-      <ApolloProvider client={client}>
-        <Component />
-      </ApolloProvider>,
-    );
+    const context = useProvider({ client }, {});
+    wrapper = mount(<Component context={context} />);
   });
 
   it('renders using the children prop', done => {
-    const Component = () => <Query query={allPeopleQuery}>{_ => <div />}</Query>;
+    const Component = () => {
+      const result = useQuery({ query: allPeopleQuery });
+      return <div />;
+    };
 
     wrapper = mount(
       <MockedProvider mocks={allPeopleMocks}>
@@ -129,17 +124,14 @@ describe('Query component', () => {
         first: 1,
       };
 
-      const Component = () => (
-        <Query query={queryWithVariables} variables={variables}>
-          {result => {
-            catchAsyncError(done, () => {
-              expect(result.client).toBeInstanceOf(ApolloClient);
-              done();
-            });
-            return null;
-          }}
-        </Query>
-      );
+      const Component = () => {
+        const result = useQuery({ query: queryWithVariables, variables });
+        catchAsyncError(done, () => {
+          expect(result.client).toBeInstanceOf(ApolloClient);
+          done();
+        });
+        return null;
+      };
 
       wrapper = mount(
         <MockedProvider mocks={mocksWithVariable}>
