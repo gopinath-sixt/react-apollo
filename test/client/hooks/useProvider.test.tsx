@@ -29,7 +29,7 @@ describe('<ApolloProvider /> Component', () => {
 
   function Container(props: Props) {
     const state: any = useState({});
-    const context = useProvider({ client: state.client || props.client }, {});
+    const context = useProvider({ client: state.client || props.client });
     return <Child />;
   }
 

@@ -6,7 +6,7 @@ import { InMemoryCache as Cache } from 'apollo-cache-inmemory';
 import { DataProxy } from 'apollo-cache';
 import { ExecutionResult, GraphQLError } from 'graphql';
 
-import { useMutation, useProvider } from '../../../src/hooks';
+import { useMutation, useQuery, useProvider } from '../../../src/hooks';
 import { MockedProvider, MockLink, mockSingleLink } from '../../../src/test-utils';
 
 import stripSymbols from '../../test-utils/stripSymbols';
@@ -113,7 +113,7 @@ it('pick prop client over context client', async done => {
   const spy = jest.fn();
 
   const Component = (props: any) => {
-    const context = useProvider({ client: contextClient, ...props }, {});
+    const context = useProvider({ client: contextClient, ...props });
     const [_, createTodo] = useMutation({ client: propsClient, mutation });
     return <button onClick={() => createTodo().then(spy)} />;
   };
@@ -439,30 +439,27 @@ it('renders an error state and throws when encountering graphql errors', done =>
 
   const expectedError = new ApolloError({ graphQLErrors: [new GraphQLError('error occurred')] });
 
-  const Component = () => (
-    <Mutation mutation={mutation}>
-      {(createTodo, result) => {
-        if (count === 0) {
-          setTimeout(() =>
-            createTodo()
-              .then(() => {
-                done.fail('Did not expect a result');
-              })
-              .catch(e => {
-                expect(e).toEqual(expectedError);
-              }),
-          );
-        } else if (count === 1) {
-          expect(result.loading).toBeTruthy();
-        } else if (count === 2) {
-          expect(result.error).toEqual(expectedError);
-          done();
-        }
-        count++;
-        return <div />;
-      }}
-    </Mutation>
-  );
+  const Component = () => {
+    const [result, createTodo] = useMutation({ mutation });
+    if (count === 0) {
+      setTimeout(() =>
+        createTodo()
+          .then(() => {
+            done.fail('Did not expect a result');
+          })
+          .catch(e => {
+            expect(e).toEqual(expectedError);
+          }),
+      );
+    } else if (count === 1) {
+      expect(result.loading).toBeTruthy();
+    } else if (count === 2) {
+      expect(result.error).toEqual(expectedError);
+      done();
+    }
+    count++;
+    return <div />;
+  };
 
   const mockError = [
     {
@@ -482,37 +479,34 @@ it('renders an error state and throws when encountering graphql errors', done =>
 
 it('renders an error state and does not throw when encountering graphql errors when errorPolicy=all', done => {
   let count = 0;
-  const Component = () => (
-    <Mutation mutation={mutation}>
-      {(createTodo, result) => {
-        if (count === 0) {
-          setTimeout(() =>
-            createTodo()
-              .then(fetchResult => {
-                if (fetchResult && fetchResult.errors) {
-                  expect(fetchResult.errors.length).toEqual(1);
-                  expect(fetchResult.errors[0]).toEqual(new GraphQLError('error occurred'));
-                } else {
-                  done.fail(`Expected an object with array of errors but got ${fetchResult}`);
-                }
-              })
-              .catch(e => {
-                done.fail(e);
-              }),
-          );
-        } else if (count === 1) {
-          expect(result.loading).toBeTruthy();
-        } else if (count === 2) {
-          expect(result.error).toEqual(
-            new ApolloError({ graphQLErrors: [new GraphQLError('error occurred')] }),
-          );
-          done();
-        }
-        count++;
-        return <div />;
-      }}
-    </Mutation>
-  );
+  const Component = () => {
+    const [result, createTodo] = useMutation({ mutation });
+    if (count === 0) {
+      setTimeout(() =>
+        createTodo()
+          .then(fetchResult => {
+            if (fetchResult && fetchResult.errors) {
+              expect(fetchResult.errors.length).toEqual(1);
+              expect(fetchResult.errors[0]).toEqual(new GraphQLError('error occurred'));
+            } else {
+              done.fail(`Expected an object with array of errors but got ${fetchResult}`);
+            }
+          })
+          .catch(e => {
+            done.fail(e);
+          }),
+      );
+    } else if (count === 1) {
+      expect(result.loading).toBeTruthy();
+    } else if (count === 2) {
+      expect(result.error).toEqual(
+        new ApolloError({ graphQLErrors: [new GraphQLError('error occurred')] }),
+      );
+      done();
+    }
+    count++;
+    return <div />;
+  };
 
   const mockError = [
     {
@@ -533,30 +527,27 @@ it('renders an error state and does not throw when encountering graphql errors w
 it('renders an error state and throws when encountering network errors when errorPolicy=all', done => {
   let count = 0;
   const expectedError = new ApolloError({ networkError: new Error('network error') });
-  const Component = () => (
-    <Mutation mutation={mutation}>
-      {(createTodo, result) => {
-        if (count === 0) {
-          setTimeout(() =>
-            createTodo()
-              .then(() => {
-                done.fail('Did not expect a result');
-              })
-              .catch(e => {
-                expect(e).toEqual(expectedError);
-              }),
-          );
-        } else if (count === 1) {
-          expect(result.loading).toBeTruthy();
-        } else if (count === 2) {
-          expect(result.error).toEqual(expectedError);
-          done();
-        }
-        count++;
-        return <div />;
-      }}
-    </Mutation>
-  );
+  const Component = () => {
+    const [result, createTodo] = useMutation({ mutation });
+    if (count === 0) {
+      setTimeout(() =>
+        createTodo()
+          .then(() => {
+            done.fail('Did not expect a result');
+          })
+          .catch(e => {
+            expect(e).toEqual(expectedError);
+          }),
+      );
+    } else if (count === 1) {
+      expect(result.loading).toBeTruthy();
+    } else if (count === 2) {
+      expect(result.error).toEqual(expectedError);
+      done();
+    }
+    count++;
+    return <div />;
+  };
 
   const mockError = [
     {
@@ -588,22 +579,16 @@ it('calls the onError prop if the mutation encounters an error', done => {
 
     render() {
       const { mutationError } = this.state;
-
-      return (
-        <Mutation mutation={mutation} onError={this.onError}>
-          {(createTodo, result) => {
-            if (!result.called) {
-              expect(mutationError).toBe(false);
-              setTimeout(() => createTodo());
-            }
-            if (onRenderCalled) {
-              expect(mutationError).toBe(true);
-              done();
-            }
-            return null;
-          }}
-        </Mutation>
-      );
+      const [result, createTodo] = useMutation({ mutation, onError: this.onError });
+      if (!result.called) {
+        expect(mutationError).toBe(false);
+        setTimeout(() => createTodo());
+      }
+      if (onRenderCalled) {
+        expect(mutationError).toBe(true);
+        done();
+      }
+      return null;
     }
   }
 
@@ -627,27 +612,24 @@ it('performs a mutation with variables prop', done => {
   };
 
   let count = 0;
-  const Component = () => (
-    <Mutation mutation={mutation} variables={variables}>
-      {(createTodo, result) => {
-        if (count === 0) {
-          setTimeout(() => {
-            createTodo();
-          });
-        } else if (count === 1) {
-          expect(result.loading).toEqual(true);
-          expect(result.called).toEqual(true);
-        } else if (count === 2) {
-          expect(result.loading).toEqual(false);
-          expect(result.called).toEqual(true);
-          expect(result.data).toEqual(data);
-          done();
-        }
-        count++;
-        return <div />;
-      }}
-    </Mutation>
-  );
+  const Component = () => {
+    const [result, createTodo] = useMutation({ mutation, variables });
+    if (count === 0) {
+      setTimeout(() => {
+        createTodo();
+      });
+    } else if (count === 1) {
+      expect(result.loading).toEqual(true);
+      expect(result.called).toEqual(true);
+    } else if (count === 2) {
+      expect(result.loading).toEqual(false);
+      expect(result.called).toEqual(true);
+      expect(result.data).toEqual(data);
+      done();
+    }
+    count++;
+    return <div />;
+  };
 
   const mocks1 = [
     {
@@ -669,27 +651,24 @@ it('allows passing a variable to the mutate function', done => {
   };
 
   let count = 0;
-  const Component = () => (
-    <Mutation mutation={mutation}>
-      {(createTodo, result) => {
-        if (count === 0) {
-          setTimeout(() => {
-            createTodo({ variables });
-          });
-        } else if (count === 1) {
-          expect(result.loading).toEqual(true);
-          expect(result.called).toEqual(true);
-        } else if (count === 2) {
-          expect(result.loading).toEqual(false);
-          expect(result.called).toEqual(true);
-          expect(result.data).toEqual(data);
-          done();
-        }
-        count++;
-        return <div />;
-      }}
-    </Mutation>
-  );
+  const Component = () => {
+    const [result, createTodo] = useMutation({ mutation });
+    if (count === 0) {
+      setTimeout(() => {
+        createTodo({ variables });
+      });
+    } else if (count === 1) {
+      expect(result.loading).toEqual(true);
+      expect(result.called).toEqual(true);
+    } else if (count === 2) {
+      expect(result.loading).toEqual(false);
+      expect(result.called).toEqual(true);
+      expect(result.data).toEqual(data);
+      done();
+    }
+    count++;
+    return <div />;
+  };
 
   const mocks1 = [
     {
@@ -723,35 +702,28 @@ it('allows an optimistic response prop', done => {
   };
 
   let count = 0;
-  const Component = () => (
-    <Mutation mutation={mutation} optimisticResponse={optimisticResponse}>
-      {(createTodo, result) => {
-        if (count === 0) {
-          setTimeout(() => {
-            createTodo();
-            const dataInStore = client.cache.extract(true);
-            expect(dataInStore['Todo:99']).toEqual(optimisticResponse.createTodo);
-          });
-        } else if (count === 1) {
-          expect(result.loading).toEqual(true);
-          expect(result.called).toEqual(true);
-        } else if (count === 2) {
-          expect(result.loading).toEqual(false);
-          expect(result.called).toEqual(true);
-          expect(result.data).toEqual(data);
-          done();
-        }
-        count++;
-        return <div />;
-      }}
-    </Mutation>
-  );
-
-  mount(
-    <ApolloProvider client={client}>
-      <Component />
-    </ApolloProvider>,
-  );
+  const Component = () => {
+    const [result, createTodo] = useMutation({ mutation, optimisticResponse });
+    if (count === 0) {
+      setTimeout(() => {
+        createTodo();
+        const dataInStore = client.cache.extract(true);
+        expect(dataInStore['Todo:99']).toEqual(optimisticResponse.createTodo);
+      });
+    } else if (count === 1) {
+      expect(result.loading).toEqual(true);
+      expect(result.called).toEqual(true);
+    } else if (count === 2) {
+      expect(result.loading).toEqual(false);
+      expect(result.called).toEqual(true);
+      expect(result.data).toEqual(data);
+      done();
+    }
+    count++;
+    return <div />;
+  };
+  const context = useProvider({ client });
+  mount(<Component />);
 });
 
 it('allows passing an optimistic response to the mutate function', done => {
@@ -772,32 +744,26 @@ it('allows passing an optimistic response to the mutate function', done => {
   };
 
   let count = 0;
-  const Component = () => (
-    <Mutation mutation={mutation}>
-      {(createTodo, result) => {
-        if (count === 0) {
-          setTimeout(() => {
-            createTodo({ optimisticResponse });
-            const dataInStore = client.cache.extract(true);
-            expect(dataInStore['Todo:99']).toEqual(optimisticResponse.createTodo);
-          });
-        } else if (count === 2) {
-          expect(result.loading).toEqual(false);
-          expect(result.called).toEqual(true);
-          expect(result.data).toEqual(data);
-          done();
-        }
-        count++;
-        return <div />;
-      }}
-    </Mutation>
-  );
+  const Component = () => {
+    const [result, createTodo] = useMutation({ mutation });
+    if (count === 0) {
+      setTimeout(() => {
+        createTodo({ optimisticResponse });
+        const dataInStore = client.cache.extract(true);
+        expect(dataInStore['Todo:99']).toEqual(optimisticResponse.createTodo);
+      });
+    } else if (count === 2) {
+      expect(result.loading).toEqual(false);
+      expect(result.called).toEqual(true);
+      expect(result.data).toEqual(data);
+      done();
+    }
+    count++;
+    return <div />;
+  };
 
-  mount(
-    <ApolloProvider client={client}>
-      <Component />
-    </ApolloProvider>,
-  );
+  const context = useProvider({ client });
+  mount(<Component />);
 });
 
 it('allows a refetchQueries prop', done => {
@@ -848,31 +814,24 @@ it('allows a refetchQueries prop', done => {
   ];
 
   let count = 0;
-  const Component = () => (
-    <Mutation mutation={mutation} refetchQueries={refetchQueries}>
-      {(createTodo, resultMutation) => (
-        <Query query={query}>
-          {resultQuery => {
-            if (count === 0) {
-              setTimeout(() => {
-                createTodo();
-              });
-            } else if (count === 1) {
-              expect(resultMutation.loading).toBe(true);
-              expect(resultQuery.loading).toBe(true);
-            } else if (count === 2) {
-              expect(resultMutation.loading).toBe(true);
-              expect(stripSymbols(resultQuery.data)).toEqual(queryData);
-              done();
-            }
-            count++;
-            return null;
-          }}
-        </Query>
-      )}
-    </Mutation>
-  );
-
+  const Component = () => {
+    const [resultMutation, createTodo] = useMutation({ mutation, refetchQueries });
+    const resultQuery = useQuery({ query });
+    if (count === 0) {
+      setTimeout(() => {
+        createTodo();
+      });
+    } else if (count === 1) {
+      expect(resultMutation.loading).toBe(true);
+      expect(resultQuery.loading).toBe(true);
+    } else if (count === 2) {
+      expect(resultMutation.loading).toBe(true);
+      expect(stripSymbols(resultQuery.data)).toEqual(queryData);
+      done();
+    }
+    count++;
+    return null;
+  };
   mount(
     <MockedProvider mocks={mocksWithQuery}>
       <Component />
@@ -935,48 +894,38 @@ it('allows a refetchQueries prop as string and variables have updated', done => 
       }, 50);
     }
     render() {
-      const { variables } = this.state;
-
-      return (
-        <Mutation mutation={mutation} refetchQueries={refetchQueries}>
-          {(createTodo, resultMutation) => (
-            <Query query={query} variables={variables}>
-              {resultQuery => {
-                if (count === 0) {
-                  // initial loading
-                  expect(resultQuery.loading).toBe(true);
-                } else if (count === 1) {
-                  // initial loaded
-                  expect(resultQuery.loading).toBe(false);
-                } else if (count === 2) {
-                  // first: 2 loading
-                  expect(resultQuery.loading).toBe(true);
-                } else if (count === 3) {
-                  // first: 2 loaded
-                  expect(resultQuery.loading).toBe(false);
-                  setTimeout(() => {
-                    createTodo();
-                  });
-                } else if (count === 4) {
-                  // mutation loading
-                  expect(resultMutation.loading).toBe(true);
-                } else if (count === 5) {
-                  // mutation loaded
-                  expect(resultMutation.loading).toBe(false);
-                } else if (count === 6) {
-                  // query refetched
-                  expect(resultQuery.loading).toBe(false);
-                  expect(resultMutation.loading).toBe(false);
-                  expect(stripSymbols(resultQuery.data)).toEqual(peopleData3);
-                  done();
-                }
-                count++;
-                return null;
-              }}
-            </Query>
-          )}
-        </Mutation>
-      );
+      const [resultMutation, createTodo] = useMutation({ mutation, refetchQueries });
+      const resultQuery = useQuery({ query });
+      if (count === 0) {
+        // initial loading
+        expect(resultQuery.loading).toBe(true);
+      } else if (count === 1) {
+        // initial loaded
+        expect(resultQuery.loading).toBe(false);
+      } else if (count === 2) {
+        // first: 2 loading
+        expect(resultQuery.loading).toBe(true);
+      } else if (count === 3) {
+        // first: 2 loaded
+        expect(resultQuery.loading).toBe(false);
+        setTimeout(() => {
+          createTodo();
+        });
+      } else if (count === 4) {
+        // mutation loading
+        expect(resultMutation.loading).toBe(true);
+      } else if (count === 5) {
+        // mutation loaded
+        expect(resultMutation.loading).toBe(false);
+      } else if (count === 6) {
+        // query refetched
+        expect(resultQuery.loading).toBe(false);
+        expect(resultMutation.loading).toBe(false);
+        expect(stripSymbols(resultQuery.data)).toEqual(peopleData3);
+        done();
+      }
+      count++;
+      return null;
     }
   }
 
@@ -1035,30 +984,24 @@ it('allows refetchQueries to be passed to the mutate function', done => {
   ];
 
   let count = 0;
-  const Component = () => (
-    <Mutation mutation={mutation}>
-      {(createTodo, resultMutation) => (
-        <Query query={query}>
-          {resultQuery => {
-            if (count === 0) {
-              setTimeout(() => {
-                createTodo({ refetchQueries });
-              });
-            } else if (count === 1) {
-              expect(resultMutation.loading).toBe(true);
-              expect(resultQuery.loading).toBe(true);
-            } else if (count === 2) {
-              expect(resultMutation.loading).toBe(true);
-              expect(stripSymbols(resultQuery.data)).toEqual(queryData);
-              done();
-            }
-            count++;
-            return null;
-          }}
-        </Query>
-      )}
-    </Mutation>
-  );
+  const Component = () => {
+    const [resultMutation, createTodo] = useMutation({ mutation });
+    const resultQuery = useQuery({ query });
+    if (count === 0) {
+      setTimeout(() => {
+        createTodo({ refetchQueries });
+      });
+    } else if (count === 1) {
+      expect(resultMutation.loading).toBe(true);
+      expect(resultQuery.loading).toBe(true);
+    } else if (count === 2) {
+      expect(resultMutation.loading).toBe(true);
+      expect(stripSymbols(resultQuery.data)).toEqual(queryData);
+      done();
+    }
+    count++;
+    return null;
+  };
 
   mount(
     <MockedProvider mocks={mocksWithQuery}>
@@ -1073,22 +1016,19 @@ it('has an update prop for updating the store after the mutation', done => {
   };
 
   let count = 0;
-  const Component = () => (
-    <Mutation mutation={mutation} update={update}>
-      {createTodo => {
-        if (count === 0) {
-          setTimeout(() => {
-            createTodo().then((response: any) => {
-              expect(response!.data).toEqual(data);
-              done();
-            });
-          });
-        }
-        count++;
-        return null;
-      }}
-    </Mutation>
-  );
+  const Component = () => {
+    const [_, createTodo] = useMutation({ mutation, update });
+    if (count === 0) {
+      setTimeout(() => {
+        createTodo().then((response: any) => {
+          expect(response!.data).toEqual(data);
+          done();
+        });
+      });
+    }
+    count++;
+    return null;
+  };
 
   mount(
     <MockedProvider mocks={mocks}>
@@ -1103,22 +1043,19 @@ it('allows update to be passed to the mutate function', done => {
   };
 
   let count = 0;
-  const Component = () => (
-    <Mutation mutation={mutation}>
-      {createTodo => {
-        if (count === 0) {
-          setTimeout(() => {
-            createTodo({ update }).then((response: any) => {
-              expect(response!.data).toEqual(data);
-              done();
-            });
-          });
-        }
-        count++;
-        return null;
-      }}
-    </Mutation>
-  );
+  const Component = () => {
+    const [_, createTodo] = useMutation({ mutation, update });
+    if (count === 0) {
+      setTimeout(() => {
+        createTodo({ update }).then((response: any) => {
+          expect(response!.data).toEqual(data);
+          done();
+        });
+      });
+    }
+    count++;
+    return null;
+  };
 
   mount(
     <MockedProvider mocks={mocks}>
@@ -1137,24 +1074,21 @@ it('allows for overriding the options passed in the props by passing them in the
   };
 
   let count = 0;
-  const Component = () => (
-    <Mutation mutation={mutation} variables={variablesProp}>
-      {(createTodo, result) => {
-        if (count === 0) {
-          setTimeout(() => {
-            createTodo({ variables: variablesMutateFn });
-          });
-        } else if (count === 2) {
-          expect(result.loading).toEqual(false);
-          expect(result.called).toEqual(true);
-          expect(result.data).toEqual(data2);
-          done();
-        }
-        count++;
-        return <div />;
-      }}
-    </Mutation>
-  );
+  const Component = () => {
+    const [result, createTodo] = useMutation({ mutation, variables: variablesProp });
+    if (count === 0) {
+      setTimeout(() => {
+        createTodo({ variables: variablesMutateFn });
+      });
+    } else if (count === 2) {
+      expect(result.loading).toEqual(false);
+      expect(result.called).toEqual(true);
+      expect(result.data).toEqual(data2);
+      done();
+    }
+    count++;
+    return <div />;
+  };
 
   const mocks1 = [
     {
@@ -1211,39 +1145,33 @@ it('updates if the client changes', done => {
     };
 
     render() {
-      return (
-        <ApolloProvider client={this.state.client}>
-          <Mutation mutation={mutation}>
-            {(createTodo, result) => {
-              if (count === 0) {
-                expect(result.called).toEqual(false);
-                expect(result.loading).toEqual(false);
-                setTimeout(() => {
-                  createTodo();
-                });
-              } else if (count === 2 && result) {
-                expect(result.data).toEqual(data);
-                setTimeout(() => {
-                  this.setState({
-                    client: client2,
-                  });
-                });
-              } else if (count === 3) {
-                expect(result.called).toEqual(false);
-                expect(result.loading).toEqual(false);
-                setTimeout(() => {
-                  createTodo();
-                });
-              } else if (count === 5) {
-                expect(result.data).toEqual(data3);
-                done();
-              }
-              count++;
-              return null;
-            }}
-          </Mutation>
-        </ApolloProvider>
-      );
+      const context = useProvider({ client: this.state.client });
+      const [result, createTodo] = useMutation({ mutation });
+      if (count === 0) {
+        expect(result.called).toEqual(false);
+        expect(result.loading).toEqual(false);
+        setTimeout(() => {
+          createTodo();
+        });
+      } else if (count === 2 && result) {
+        expect(result.data).toEqual(data);
+        setTimeout(() => {
+          this.setState({
+            client: client2,
+          });
+        });
+      } else if (count === 3) {
+        expect(result.called).toEqual(false);
+        expect(result.loading).toEqual(false);
+        setTimeout(() => {
+          createTodo();
+        });
+      } else if (count === 5) {
+        expect(result.data).toEqual(data3);
+        done();
+      }
+      count++;
+      return null;
     }
   }
 
@@ -1271,28 +1199,22 @@ it('uses client from props instead of one provided by context', () => {
 
   let count = 0;
 
-  mount(
-    <ApolloProvider client={client1}>
-      <Mutation client={client2} mutation={mutation}>
-        {(createTodo, result) => {
-          if (!result.called) {
-            setTimeout(() => {
-              createTodo();
-            });
-          }
+  const context = useProvider({ client: client1 });
+  const [result, createTodo] = useMutation({ client: client2, mutation });
+  if (!result.called) {
+    setTimeout(() => {
+      createTodo();
+    });
+  }
 
-          if (count === 2) {
-            expect(result.loading).toEqual(false);
-            expect(result.called).toEqual(true);
-            expect(result.data).toEqual(data2);
-          }
+  if (count === 2) {
+    expect(result.loading).toEqual(false);
+    expect(result.called).toEqual(true);
+    expect(result.data).toEqual(data2);
+  }
 
-          count++;
-          return <div />;
-        }}
-      </Mutation>
-    </ApolloProvider>,
-  );
+  count++;
+  mount(<div />);
 });
 
 it('errors if a query is passed instead of a mutation', () => {
@@ -1309,9 +1231,10 @@ it('errors if a query is passed instead of a mutation', () => {
   console.error = () => {}; // tslint:disable-line
 
   expect(() => {
+    const [result, createTodo] = useMutation({ mutation: query });
     mount(
       <MockedProvider>
-        <Mutation mutation={query}>{() => null}</Mutation>
+        <div>x</div>
       </MockedProvider>,
     );
   }).toThrowError('The <Mutation /> component requires a graphql mutation, but got a query.');
@@ -1340,18 +1263,15 @@ it('errors when changing from mutation to a query', done => {
       done();
     }
     render() {
-      return (
-        <Mutation mutation={this.state.query}>
-          {() => {
-            setTimeout(() => {
-              this.setState({
-                query,
-              });
-            });
-            return null;
-          }}
-        </Mutation>
-      );
+      const [result, createTodo] = useMutation({ mutation: this.state.query });
+      return () => {
+        setTimeout(() => {
+          this.setState({
+            query,
+          });
+        });
+        return null;
+      };
     }
   }
 
@@ -1382,9 +1302,10 @@ it('errors if a subscription is passed instead of a mutation', () => {
   console.error = () => {}; // tslint:disable-line
 
   expect(() => {
+    const [result, createTodo] = useMutation({ mutation: subscription });
     mount(
       <MockedProvider>
-        <Mutation mutation={subscription}>{() => null}</Mutation>
+        {/* <Mutation mutation={subscription}>{() => null}</Mutation> */}
       </MockedProvider>,
     );
   }).toThrowError(
@@ -1417,18 +1338,13 @@ it('errors when changing from mutation to a subscription', done => {
       done();
     }
     render() {
-      return (
-        <Mutation mutation={this.state.query}>
-          {() => {
-            setTimeout(() => {
-              this.setState({
-                query: subscription,
-              });
-            });
-            return null;
-          }}
-        </Mutation>
-      );
+      const [result, createTodo] = useMutation({ mutation });
+      setTimeout(() => {
+        this.setState({
+          query: subscription,
+        });
+      });
+      return null;
     }
   }
 
@@ -1468,20 +1384,15 @@ it('does not update state after receiving data after it has been unmounted', don
       if (called === true) {
         return null;
       } else {
-        return (
-          <Mutation mutation={mutation}>
-            {(createTodo, result) => {
-              if (!result.called) {
-                setTimeout(() => {
-                  createTodo();
-                  this.setState({ called: true }, checker);
-                });
-              }
+        const [result, createTodo] = useMutation({ mutation });
+        if (!result.called) {
+          setTimeout(() => {
+            createTodo();
+            this.setState({ called: true }, checker);
+          });
+        }
 
-              return null;
-            }}
-          </Mutation>
-        );
+        return null;
       }
     }
   }
@@ -1518,20 +1429,14 @@ it('does not update state after receiving error after it has been unmounted', do
       if (called === true) {
         return null;
       } else {
-        return (
-          <Mutation mutation={mutation}>
-            {(createTodo, result) => {
-              if (!result.called) {
-                setTimeout(() => {
-                  createTodo().catch(() => {}); // tslint:disable-line
-                  this.setState({ called: true }, checker);
-                }, 10);
-              }
-
-              return null;
-            }}
-          </Mutation>
-        );
+        const [result, createTodo] = useMutation({ mutation });
+        if (!result.called) {
+          setTimeout(() => {
+            createTodo().catch(() => {}); // tslint:disable-line
+            this.setState({ called: true }, checker);
+          }, 10);
+        }
+        return null;
       }
     }
   }

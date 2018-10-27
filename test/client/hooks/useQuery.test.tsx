@@ -35,6 +35,10 @@ const allPeopleMocks = [
   },
 ];
 
+function useAllPeopleQuery(props: any) {
+  return useQuery(props);
+}
+
 describe('Query component', () => {
   let wrapper: ReactWrapper<any, any> | null;
   beforeEach(() => {
@@ -59,7 +63,7 @@ describe('Query component', () => {
     });
 
     const Component = (props: any) => {
-      const result = useQuery({ query: allPeopleQuery, ...props }, {});
+      const result = useQuery({ query: allPeopleQuery, ...props });
 
       catchAsyncError(done, () => {
         const { client: clientResult, ...rest } = result;
@@ -75,14 +79,14 @@ describe('Query component', () => {
       return null;
     };
 
-    const context = useProvider({ client }, {});
+    const context = useProvider({ client });
     wrapper = mount(<Component context={context} />);
   });
 
   it('renders using the children prop', done => {
     const Component = () => {
       const result = useQuery({ query: allPeopleQuery });
-      return <div />;
+      return <div>{JSON.stringify(result)}</div>;
     };
 
     wrapper = mount(
@@ -148,20 +152,17 @@ describe('Query component', () => {
         },
       ];
 
-      const Component = () => (
-        <Query query={allPeopleQuery}>
-          {result => {
-            if (result.loading) {
-              return null;
-            }
-            catchAsyncError(done, () => {
-              expect(result.error).toEqual(new Error('Network error: error occurred'));
-              done();
-            });
-            return null;
-          }}
-        </Query>
-      );
+      const Component = () => {
+        const result = useQuery({ query: allPeopleQuery });
+        if (result.loading) {
+          return null;
+        }
+        catchAsyncError(done, () => {
+          expect(result.error).toEqual(new Error('Network error: error occurred'));
+          done();
+        });
+        return null;
+      };
 
       wrapper = mount(
         <MockedProvider mocks={mockError}>
@@ -209,58 +210,55 @@ describe('Query component', () => {
 
       expect.assertions(5);
 
-      const Component = () => (
-        <AllPeopleQuery
-          query={queryRefetch}
-          variables={refetchVariables}
-          notifyOnNetworkStatusChange
-        >
-          {result => {
-            const { data, loading } = result;
-            if (loading) {
-              count++;
-              return null;
-            }
+      const Component = () => {
+        const result = useAllPeopleQuery({
+          query: queryRefetch,
+          variables: refetchVariables,
+          notifyOnNetworkStatusChange: true,
+        });
+        const { data, loading } = result;
+        if (loading) {
+          count++;
+          return null;
+        }
 
-            catchAsyncError(done, () => {
-              if (count === 1) {
-                // first data
-                expect(stripSymbols(data)).toEqual(data1);
-              }
-              if (count === 3) {
-                // second data
-                expect(stripSymbols(data)).toEqual(data2);
-              }
-              if (count === 5) {
-                // third data
-                expect(stripSymbols(data)).toEqual(data3);
-              }
-            });
+        catchAsyncError(done, () => {
+          if (count === 1) {
+            // first data
+            expect(stripSymbols(data)).toEqual(data1);
+          }
+          if (count === 3) {
+            // second data
+            expect(stripSymbols(data)).toEqual(data2);
+          }
+          if (count === 5) {
+            // third data
+            expect(stripSymbols(data)).toEqual(data3);
+          }
+        });
 
-            count++;
-            if (hasRefetched) {
-              return null;
-            }
+        count++;
+        if (hasRefetched) {
+          return null;
+        }
 
-            hasRefetched = true;
-            setTimeout(() => {
-              result
-                .refetch()
-                .then(result1 => {
-                  expect(stripSymbols(result1.data)).toEqual(data2);
-                  return result.refetch({ first: 2 });
-                })
-                .then(result2 => {
-                  expect(stripSymbols(result2.data)).toEqual(data3);
-                  done();
-                })
-                .catch(done.fail);
-            });
+        hasRefetched = true;
+        setTimeout(() => {
+          result
+            .refetch()
+            .then(result1 => {
+              expect(stripSymbols(result1.data)).toEqual(data2);
+              return result.refetch({ first: 2 });
+            })
+            .then(result2 => {
+              expect(stripSymbols(result2.data)).toEqual(data3);
+              done();
+            })
+            .catch(done.fail);
+        });
 
-            return null;
-          }}
-        </AllPeopleQuery>
-      );
+        return null;
+      };
 
       wrapper = mount(
         <MockedProvider mocks={mocks} addTypename={false}>
@@ -291,46 +289,43 @@ describe('Query component', () => {
       let count = 0;
       expect.assertions(2);
 
-      const Component = () => (
-        <AllPeopleQuery query={allPeopleQuery} variables={variables}>
-          {result => {
-            if (result.loading) {
-              return null;
-            }
-            if (count === 0) {
-              result
-                .fetchMore({
-                  variables: { first: 1 },
-                  updateQuery: (prev, { fetchMoreResult }) =>
-                    fetchMoreResult
-                      ? {
-                          allPeople: {
-                            people: [...prev.allPeople.people, ...fetchMoreResult.allPeople.people],
-                          },
-                        }
-                      : prev,
-                })
-                .then(result2 => {
-                  expect(stripSymbols(result2.data)).toEqual(data2);
-                })
-                .catch(done.fail);
-            } else if (count === 1) {
-              catchAsyncError(done, () => {
-                expect(stripSymbols(result.data)).toEqual({
-                  allPeople: {
-                    people: [...data1.allPeople.people, ...data2.allPeople.people],
-                  },
-                });
+      const Component = () => {
+        const result = useQuery({ query: allPeopleQuery, variables });
+        if (result.loading) {
+          return null;
+        }
+        if (count === 0) {
+          result
+            .fetchMore({
+              variables: { first: 1 },
+              updateQuery: (prev, { fetchMoreResult }) =>
+                fetchMoreResult
+                  ? {
+                      allPeople: {
+                        people: [...prev.allPeople.people, ...fetchMoreResult.allPeople.people],
+                      },
+                    }
+                  : prev,
+            })
+            .then(result2 => {
+              expect(stripSymbols(result2.data)).toEqual(data2);
+            })
+            .catch(done.fail);
+        } else if (count === 1) {
+          catchAsyncError(done, () => {
+            expect(stripSymbols(result.data)).toEqual({
+              allPeople: {
+                people: [...data1.allPeople.people, ...data2.allPeople.people],
+              },
+            });
 
-                done();
-              });
-            }
+            done();
+          });
+        }
 
-            count++;
-            return null;
-          }}
-        </AllPeopleQuery>
-      );
+        count++;
+        return null;
+      };
 
       wrapper = mount(
         <MockedProvider mocks={mocks} addTypename={false}>
@@ -368,31 +363,28 @@ describe('Query component', () => {
       const POLL_INTERVAL = 30;
       const POLL_COUNT = 3;
 
-      const Component = () => (
-        <Query query={allPeopleQuery}>
-          {result => {
-            if (result.loading) {
-              return null;
-            }
-            if (!isPolling) {
-              isPolling = true;
-              result.startPolling(POLL_INTERVAL);
-            }
-            catchAsyncError(done, () => {
-              if (count === 0) {
-                expect(stripSymbols(result.data)).toEqual(data1);
-              } else if (count === 1) {
-                expect(stripSymbols(result.data)).toEqual(data2);
-              } else if (count === 2) {
-                expect(stripSymbols(result.data)).toEqual(data3);
-              }
-            });
+      const Component = () => {
+        const result = useQuery({ query: allPeopleQuery });
+        if (result.loading) {
+          return null;
+        }
+        if (!isPolling) {
+          isPolling = true;
+          result.startPolling(POLL_INTERVAL);
+        }
+        catchAsyncError(done, () => {
+          if (count === 0) {
+            expect(stripSymbols(result.data)).toEqual(data1);
+          } else if (count === 1) {
+            expect(stripSymbols(result.data)).toEqual(data2);
+          } else if (count === 2) {
+            expect(stripSymbols(result.data)).toEqual(data3);
+          }
+        });
 
-            count++;
-            return null;
-          }}
-        </Query>
-      );
+        count++;
+        return null;
+      };
 
       wrapper = mount(
         <MockedProvider mocks={mocks} addTypename={false}>
@@ -435,23 +427,20 @@ describe('Query component', () => {
       const POLL_INTERVAL = 30;
       let count = 0;
 
-      const Component = () => (
-        <Query query={allPeopleQuery} pollInterval={POLL_INTERVAL}>
-          {result => {
-            if (result.loading) {
-              return null;
-            }
-            if (count === 0) {
-              expect(stripSymbols(result.data)).toEqual(data1);
-            } else if (count === 1) {
-              expect(stripSymbols(result.data)).toEqual(data2);
-              result.stopPolling();
-            }
-            count++;
-            return null;
-          }}
-        </Query>
-      );
+      const Component = () => {
+        const result = useQuery({ query: allPeopleQuery, pollInterval: POLL_INTERVAL });
+        if (result.loading) {
+          return null;
+        }
+        if (count === 0) {
+          expect(stripSymbols(result.data)).toEqual(data1);
+        } else if (count === 1) {
+          expect(stripSymbols(result.data)).toEqual(data2);
+          result.stopPolling();
+        }
+        count++;
+        return null;
+      };
 
       wrapper = mount(
         <MockedProvider mocks={mocks} addTypename={false}>
@@ -483,37 +472,34 @@ describe('Query component', () => {
       let isUpdated = false;
       expect.assertions(3);
 
-      const Component = () => (
-        <AllPeopleQuery query={allPeopleQuery} variables={variables}>
-          {result => {
-            if (result.loading) {
-              return null;
-            }
-            if (isUpdated) {
-              catchAsyncError(done, () => {
-                expect(stripSymbols(result.data)).toEqual(data2);
+      const Component = () => {
+        const result = useAllPeopleQuery({ query: allPeopleQuery, variables });
+        if (result.loading) {
+          return null;
+        }
+        if (isUpdated) {
+          catchAsyncError(done, () => {
+            expect(stripSymbols(result.data)).toEqual(data2);
 
-                done();
-              });
+            done();
+          });
 
-              return null;
-            }
-            isUpdated = true;
-            setTimeout(() => {
-              result.updateQuery((prev, { variables: variablesUpdate }) => {
-                catchAsyncError(done, () => {
-                  expect(stripSymbols(prev)).toEqual(data1);
-                  expect(variablesUpdate).toEqual({ first: 2 });
-                });
+          return null;
+        }
+        isUpdated = true;
+        setTimeout(() => {
+          result.updateQuery((prev, { variables: variablesUpdate }) => {
+            catchAsyncError(done, () => {
+              expect(stripSymbols(prev)).toEqual(data1);
+              expect(variablesUpdate).toEqual({ first: 2 });
+            });
 
-                return data2;
-              });
-            }, 0);
+            return data2;
+          });
+        }, 0);
 
-            return null;
-          }}
-        </AllPeopleQuery>
-      );
+        return null;
+      };
 
       wrapper = mount(
         <MockedProvider mocks={mocks} addTypename={false}>
@@ -525,18 +511,15 @@ describe('Query component', () => {
 
   describe('props allow', () => {
     it('custom fetch-policy', done => {
-      const Component = () => (
-        <Query query={allPeopleQuery} fetchPolicy={'cache-only'}>
-          {result => {
-            catchAsyncError(done, () => {
-              expect(result.loading).toBeFalsy();
-              expect(result.networkStatus).toBe(NetworkStatus.ready);
-              done();
-            });
-            return null;
-          }}
-        </Query>
-      );
+      const Component = () => {
+        const result = useQuery({ query: allPeopleQuery, fetchPolicy: 'cache-only' });
+        catchAsyncError(done, () => {
+          expect(result.loading).toBeFalsy();
+          expect(result.networkStatus).toBe(NetworkStatus.ready);
+          done();
+        });
+        return null;
+      };
 
       wrapper = mount(
         <MockedProvider mocks={allPeopleMocks}>
@@ -546,18 +529,15 @@ describe('Query component', () => {
     });
 
     it('default fetch-policy', done => {
-      const Component = () => (
-        <Query query={allPeopleQuery}>
-          {result => {
-            catchAsyncError(done, () => {
-              expect(result.loading).toBeFalsy();
-              expect(result.networkStatus).toBe(NetworkStatus.ready);
-              done();
-            });
-            return null;
-          }}
-        </Query>
-      );
+      const Component = () => {
+        const result = useQuery({ query: allPeopleQuery });
+        catchAsyncError(done, () => {
+          expect(result.loading).toBeFalsy();
+          expect(result.networkStatus).toBe(NetworkStatus.ready);
+          done();
+        });
+        return null;
+      };
 
       wrapper = mount(
         <MockedProvider
@@ -586,33 +566,30 @@ describe('Query component', () => {
 
       let count = 0;
       expect.assertions(4);
-      const Component = () => (
-        <Query query={allPeopleQuery} notifyOnNetworkStatusChange>
-          {result => {
-            catchAsyncError(done, () => {
-              if (count === 0) {
-                expect(result.loading).toBeTruthy();
-              }
-              if (count === 1) {
-                expect(result.loading).toBeFalsy();
-                setTimeout(() => {
-                  result.refetch();
-                });
-              }
-              if (count === 2) {
-                expect(result.loading).toBeTruthy();
-              }
-              if (count === 3) {
-                expect(result.loading).toBeFalsy();
-                done();
-              }
-
-              count++;
+      const Component = () => {
+        const result = useQuery({ query: allPeopleQuery, notifyOnNetworkStatusChange: true });
+        catchAsyncError(done, () => {
+          if (count === 0) {
+            expect(result.loading).toBeTruthy();
+          }
+          if (count === 1) {
+            expect(result.loading).toBeFalsy();
+            setTimeout(() => {
+              result.refetch();
             });
-            return null;
-          }}
-        </Query>
-      );
+          }
+          if (count === 2) {
+            expect(result.loading).toBeTruthy();
+          }
+          if (count === 3) {
+            expect(result.loading).toBeFalsy();
+            done();
+          }
+
+          count++;
+        });
+        return null;
+      };
 
       wrapper = mount(
         <MockedProvider mocks={mocks} addTypename={false}>
@@ -648,24 +625,21 @@ describe('Query component', () => {
       const POLL_COUNT = 3;
       const POLL_INTERVAL = 30;
 
-      const Component = () => (
-        <Query query={allPeopleQuery} pollInterval={POLL_INTERVAL}>
-          {result => {
-            if (result.loading) {
-              return null;
-            }
-            if (count === 0) {
-              expect(stripSymbols(result.data)).toEqual(data1);
-            } else if (count === 1) {
-              expect(stripSymbols(result.data)).toEqual(data2);
-            } else if (count === 2) {
-              expect(stripSymbols(result.data)).toEqual(data3);
-            }
-            count++;
-            return null;
-          }}
-        </Query>
-      );
+      const Component = () => {
+        const result = useQuery({ query: allPeopleQuery, pollInterval: POLL_INTERVAL });
+        if (result.loading) {
+          return null;
+        }
+        if (count === 0) {
+          expect(stripSymbols(result.data)).toEqual(data1);
+        } else if (count === 1) {
+          expect(stripSymbols(result.data)).toEqual(data2);
+        } else if (count === 2) {
+          expect(stripSymbols(result.data)).toEqual(data3);
+        }
+        count++;
+        return null;
+      };
 
       wrapper = mount(
         <MockedProvider mocks={mocks} addTypename={false}>
@@ -682,19 +656,16 @@ describe('Query component', () => {
     });
 
     it('skip', done => {
-      const Component = () => (
-        <Query query={allPeopleQuery} skip>
-          {result => {
-            catchAsyncError(done, () => {
-              expect(result.loading).toBeFalsy();
-              expect(result.data).toBe(undefined);
-              expect(result.error).toBe(undefined);
-              done();
-            });
-            return null;
-          }}
-        </Query>
-      );
+      const Component = () => {
+        const result = useQuery({ query: allPeopleQuery, skip: true });
+        catchAsyncError(done, () => {
+          expect(result.loading).toBeFalsy();
+          expect(result.data).toBe(undefined);
+          expect(result.error).toBe(undefined);
+          done();
+        });
+        return null;
+      };
 
       wrapper = mount(
         <MockedProvider mocks={allPeopleMocks} addTypename={false}>
@@ -772,12 +743,8 @@ describe('Query component', () => {
 
         render() {
           const { variables } = this.state;
-
-          return (
-            <AllPeopleQuery query={query} variables={variables} onCompleted={this.onCompleted}>
-              {() => null}
-            </AllPeopleQuery>
-          );
+          const result = useQuery({ query, variables, onCompleted: this.onCompleted });
+          return () => JSON.stringify(result);
         }
       }
 
@@ -805,17 +772,14 @@ describe('Query component', () => {
 
       const onError = jest.fn();
 
-      const Component = () => (
-        <Query query={allPeopleQuery} onError={onErrorFunc}>
-          {({ loading }) => {
-            if (!loading) {
-              expect(onError).not.toHaveBeenCalled();
-              done();
-            }
-            return null;
-          }}
-        </Query>
-      );
+      const Component = () => {
+        const { loading } = useQuery({ query: allPeopleQuery, onError: onErrorFunc });
+        if (!loading) {
+          expect(onError).not.toHaveBeenCalled();
+          done();
+        }
+        return null;
+      };
 
       wrapper = mount(
         <MockedProvider mocks={mocks} addTypename={false}>
@@ -883,17 +847,14 @@ describe('Query component', () => {
 
       const onCompleted = jest.fn();
 
-      const Component = () => (
-        <Query query={allPeopleQuery} onCompleted={onCompleted}>
-          {({ error }) => {
-            if (error) {
-              expect(onCompleted).not.toHaveBeenCalled();
-              done();
-            }
-            return null;
-          }}
-        </Query>
-      );
+      const Component = () => {
+        const { error } = useQuery({ query: allPeopleQuery, onCompleted });
+        if (error) {
+          expect(onCompleted).not.toHaveBeenCalled();
+          done();
+        }
+        return null;
+      };
 
       wrapper = mount(
         <MockedProvider mocks={mockError} addTypename={false}>
@@ -916,13 +877,10 @@ describe('Query component', () => {
         done();
       };
 
-      const Component = () => (
-        <Query query={allPeopleQuery} onError={onErrorFunc}>
-          {() => {
-            return null;
-          }}
-        </Query>
-      );
+      const Component = () => {
+        const _ = useQuery({ query: allPeopleQuery });
+        return null;
+      };
 
       wrapper = mount(
         <MockedProvider mocks={mockError} addTypename={false}>
@@ -978,30 +936,26 @@ describe('Query component', () => {
 
         render() {
           const { variables } = this.state;
+          {
+            const result = useQuery({ query, variables });
+            if (result.loading) {
+              return null;
+            }
+            catchAsyncError(done, () => {
+              if (count === 0) {
+                expect(variables).toEqual({ first: 1 });
+                expect(stripSymbols(result.data)).toEqual(data1);
+              }
+              if (count === 1) {
+                expect(variables).toEqual({ first: 2 });
+                expect(stripSymbols(result.data)).toEqual(data2);
+                done();
+              }
+            });
 
-          return (
-            <AllPeopleQuery query={query} variables={variables}>
-              {result => {
-                if (result.loading) {
-                  return null;
-                }
-                catchAsyncError(done, () => {
-                  if (count === 0) {
-                    expect(variables).toEqual({ first: 1 });
-                    expect(stripSymbols(result.data)).toEqual(data1);
-                  }
-                  if (count === 1) {
-                    expect(variables).toEqual({ first: 2 });
-                    expect(stripSymbols(result.data)).toEqual(data2);
-                    done();
-                  }
-                });
-
-                count++;
-                return null;
-              }}
-            </AllPeopleQuery>
-          );
+            count++;
+            return null;
+          }
         }
       }
 
