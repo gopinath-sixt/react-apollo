@@ -4,10 +4,7 @@ import { OperationVariables } from '../types';
 import { MutationContext } from '../Mutation';
 import { MutationProps } from './Mutation';
 
-export function useMutation(
-  props: MutationProps<any, OperationVariables>,
-  context: MutationContext,
-) {
+export function useMutation(props: MutationProps<any, OperationVariables>, context?: any) {
   const mutation = new Mutation(props, context);
   useEffect(() => {
     mutation.start();
