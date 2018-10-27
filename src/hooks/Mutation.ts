@@ -4,7 +4,6 @@ import { OperationVariables } from '../types';
 import { getClient } from '../component-utils';
 import { DocumentNode } from 'graphql';
 import { parser, DocumentType } from '../parser';
-const shallowEqual = require('fbjs/lib/shallowEqual');
 const invariant = require('invariant');
 
 const initialState = {
@@ -20,7 +19,7 @@ class Mutation<TData = any, TVariables = OperationVariables> {
   private state: any;
   private hasMounted: boolean = false;
 
-  constructor(public props: MutationProps<TData, TVariables>, public context: any) {
+  constructor(public props: MutationProps<TData, TVariables>, public context: MutationContext) {
     this.props = props;
     this.context = context;
     this.client = getClient(props, context);
@@ -39,48 +38,29 @@ class Mutation<TData = any, TVariables = OperationVariables> {
     }
   }
 
-  // TODO: move to hook
-  didMount() {
+  // used by hook
+  start() {
     this.hasMounted = true;
   }
 
-  // TODO: move to hook
-  willUnmount() {
+  // used by hook
+  finish() {
     this.hasMounted = false;
   }
 
-  // TODO: move to hook
-  willReceiveProps(nextProps: MutationProps<TData, TVariables>, nextContext: MutationContext) {
-    const nextClient = getClient(nextProps, nextContext);
-    if (shallowEqual(this.props, nextProps) && this.client === nextClient) {
-      return;
-    }
-
-    if (this.props.mutation !== nextProps.mutation) {
-      this.verifyDocumentIsMutation(nextProps.mutation);
-    }
-
-    if (this.client !== nextClient) {
-      this.client = nextClient;
-      this.setState(initialState);
-    }
-  }
-
   // render
-  // TODO: move to hook
-  init() {
-    const { children } = this.props;
+  // use by hook
+  api() {
     const { loading, data, error, called } = this.state;
 
-    const result = {
+    return {
       called,
       loading,
       data,
       error,
       client: this.client,
+      runMutation: this.runMutation,
     };
-
-    return children(this.runMutation, result);
   }
 
   private runMutation = (options: MutationOptions<TData, TVariables> = {}) => {

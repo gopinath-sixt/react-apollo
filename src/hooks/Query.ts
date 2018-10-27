@@ -46,24 +46,6 @@ export function observableQueryFields<TData, TVariables>(
 }
 
 export default class Query<TData = any, TVariables = OperationVariables> {
-  static contextTypes = {
-    client: PropTypes.object,
-    operations: PropTypes.object,
-  };
-
-  static propTypes = {
-    client: PropTypes.object,
-    children: PropTypes.func.isRequired,
-    fetchPolicy: PropTypes.string,
-    notifyOnNetworkStatusChange: PropTypes.bool,
-    onCompleted: PropTypes.func,
-    onError: PropTypes.func,
-    pollInterval: PropTypes.number,
-    query: PropTypes.object.isRequired,
-    variables: PropTypes.object,
-    ssr: PropTypes.bool,
-    partialRefetch: PropTypes.bool,
-  };
   protected context: QueryContext | undefined;
   private client: ApolloClient<Object>;
 
@@ -94,7 +76,6 @@ export default class Query<TData = any, TVariables = OperationVariables> {
 
     // pull off react options
     const {
-      children,
       ssr,
       displayName,
       skip,
@@ -120,8 +101,8 @@ export default class Query<TData = any, TVariables = OperationVariables> {
     return result.loading ? observable.result() : false;
   }
 
-  // TODO: move to hook
-  didMount() {
+  // use by hook
+  start() {
     this.hasMounted = true;
     if (this.props.skip) return;
 
@@ -135,7 +116,9 @@ export default class Query<TData = any, TVariables = OperationVariables> {
   }
 
   // TODO: move to hook
-  willReceiveProps(nextProps: QueryProps<TData, TVariables>, nextContext: QueryContext) {
+  willReceiveProps() {
+    const nextProps: QueryProps<TData, TVariables> = this.props;
+    const nextContext: QueryContext = this.context || {};
     // the next render wants to skip
     if (nextProps.skip && !this.props.skip) {
       this.removeQuerySubscription();
@@ -166,13 +149,14 @@ export default class Query<TData = any, TVariables = OperationVariables> {
   }
 
   // TODO: move to hook
-  willUnmount() {
+  finish() {
     this.removeQuerySubscription();
     this.hasMounted = false;
+    this.finished();
   }
 
   // TODO: move to hook
-  didUpdate() {
+  finished() {
     const { onCompleted, onError } = this.props;
     if (onCompleted || onError) {
       const currentResult = this.queryObservable!.currentResult();
@@ -187,10 +171,8 @@ export default class Query<TData = any, TVariables = OperationVariables> {
 
   // render
   // TODO: move to hook
-  init() {
-    const { children } = this.props;
-    const queryResult = this.getQueryResult();
-    return children(queryResult);
+  api() {
+    return this.getQueryResult();
   }
 
   private extractOptsFromProps(props: QueryProps<TData, TVariables>) {
