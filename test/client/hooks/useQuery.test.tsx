@@ -803,9 +803,11 @@ describe('Query component', () => {
       const errorLogger = console.error;
       console.error = () => {}; // tslint:disable-line
       expect(() => {
+        const result = useQuery({ query: mutation });
+        // TODO: fix
         mount(
           <MockedProvider>
-            <Query query={mutation}>{() => null}</Query>
+            <div>x</div>
           </MockedProvider>,
         );
       }).toThrowError('The <Query /> component requires a graphql query, but got a mutation.');
@@ -827,9 +829,11 @@ describe('Query component', () => {
       const errorLogger = console.error;
       console.error = () => {}; // tslint:disable-line
       expect(() => {
+        const result = useQuery({ query: subscription });
+        // TODO: fix
         mount(
           <MockedProvider>
-            <Query query={subscription}>{() => null}</Query>
+            <div>x</div>
           </MockedProvider>,
         );
       }).toThrowError('The <Query /> component requires a graphql query, but got a subscription.');
@@ -936,26 +940,24 @@ describe('Query component', () => {
 
         render() {
           const { variables } = this.state;
-          {
-            const result = useQuery({ query, variables });
-            if (result.loading) {
-              return null;
-            }
-            catchAsyncError(done, () => {
-              if (count === 0) {
-                expect(variables).toEqual({ first: 1 });
-                expect(stripSymbols(result.data)).toEqual(data1);
-              }
-              if (count === 1) {
-                expect(variables).toEqual({ first: 2 });
-                expect(stripSymbols(result.data)).toEqual(data2);
-                done();
-              }
-            });
-
-            count++;
+          const result = useQuery({ query, variables });
+          if (result.loading) {
             return null;
           }
+          catchAsyncError(done, () => {
+            if (count === 0) {
+              expect(variables).toEqual({ first: 1 });
+              expect(stripSymbols(result.data)).toEqual(data1);
+            }
+            if (count === 1) {
+              expect(variables).toEqual({ first: 2 });
+              expect(stripSymbols(result.data)).toEqual(data2);
+              done();
+            }
+          });
+
+          count++;
+          return null;
         }
       }
 
@@ -1002,29 +1004,23 @@ describe('Query component', () => {
 
         render() {
           const { query } = this.state;
+          const result = useQuery({ query });
+          if (result.loading) return null;
+          catchAsyncError(done, () => {
+            if (count === 0) {
+              expect(stripSymbols(result.data)).toEqual(data1);
+              setTimeout(() => {
+                this.setState({ query: query2 });
+              });
+            }
+            if (count === 1) {
+              expect(stripSymbols(result.data)).toEqual(data2);
+              done();
+            }
+          });
 
-          return (
-            <Query query={query}>
-              {result => {
-                if (result.loading) return null;
-                catchAsyncError(done, () => {
-                  if (count === 0) {
-                    expect(stripSymbols(result.data)).toEqual(data1);
-                    setTimeout(() => {
-                      this.setState({ query: query2 });
-                    });
-                  }
-                  if (count === 1) {
-                    expect(stripSymbols(result.data)).toEqual(data2);
-                    done();
-                  }
-                });
-
-                count++;
-                return null;
-              }}
-            </Query>
-          );
+          count++;
+          return null;
         }
       }
 
@@ -1084,24 +1080,15 @@ describe('Query component', () => {
           if (Object.keys(this.props).length === 0) {
             return null;
           }
-
-          const query = (
-            <Query query={allPeopleQuery} client={this.props.propsClient}>
-              {result => {
-                if (result.data && result.data.allPeople) {
-                  this.props.renderedName(result.data.allPeople.people[0].name);
-                }
-
-                return null;
-              }}
-            </Query>
-          );
-
-          if (this.props.contextClient) {
-            return <ApolloProvider client={this.props.contextClient}>{query}</ApolloProvider>;
+          const result = useQuery({ query: allPeopleQuery, client: this.props.propsClient });
+          if (result.data && result.data.allPeople) {
+            this.props.renderedName(result.data.allPeople.people[0].name);
           }
-
-          return query;
+          const query = null;
+          if (this.props.contextClient) {
+            const context = useProvider({ client: this.props.contextClient });
+          }
+          return null;
         }
       }
 
@@ -1166,24 +1153,18 @@ describe('Query component', () => {
 
         render() {
           const { variables } = this.state;
+          const result = useAllPeopleQuery({ query, variables });
+          catchAsyncError(done, () => {
+            if (result.loading && count === 2) {
+              expect(stripSymbols(result.data)).toEqual(data1);
+              done();
+            }
 
-          return (
-            <AllPeopleQuery query={query} variables={variables}>
-              {result => {
-                catchAsyncError(done, () => {
-                  if (result.loading && count === 2) {
-                    expect(stripSymbols(result.data)).toEqual(data1);
-                    done();
-                  }
+            return null;
+          });
 
-                  return null;
-                });
-
-                count++;
-                return null;
-              }}
-            </AllPeopleQuery>
-          );
+          count++;
+          return null;
         }
       }
 
@@ -1234,7 +1215,8 @@ describe('Query component', () => {
 
       render() {
         const { query } = this.state;
-        return <Query query={query}>{() => null}</Query>;
+        const result = useQuery({ query });
+        return null;
       }
     }
 
@@ -1271,81 +1253,74 @@ describe('Query component', () => {
     let count = 0;
     const noop = () => null;
 
-    class AllPeopleQuery2 extends Query<Data> {}
-
-    function Container() {
-      return (
-        <AllPeopleQuery2 query={query} notifyOnNetworkStatusChange>
-          {(result: any) => {
-            try {
-              switch (count++) {
-                case 0:
-                  // Waiting for the first result to load
-                  expect(result.loading).toBeTruthy();
-                  break;
-                case 1:
-                  if (!result.data!.allPeople) {
-                    done.fail('Should have data by this point');
-                    break;
-                  }
-                  // First result is loaded, run a refetch to get the second result
-                  // which is an error.
-                  expect(stripSymbols(result.data!.allPeople)).toEqual(data.allPeople);
-                  setTimeout(() => {
-                    result.refetch().then(() => {
-                      done.fail('Expected error value on first refetch.');
-                    }, noop);
-                  }, 0);
-                  break;
-                case 2:
-                  // Waiting for the second result to load
-                  expect(result.loading).toBeTruthy();
-                  break;
-                case 3:
-                  // The error arrived, run a refetch to get the third result
-                  // which should now contain valid data.
-                  expect(result.loading).toBeFalsy();
-                  expect(result.error).toBeTruthy();
-                  setTimeout(() => {
-                    result.refetch().catch(() => {
-                      done.fail('Expected good data on second refetch.');
-                    });
-                  }, 0);
-                  break;
-                // Further fix required in QueryManager, we should have an extra
-                // step for the loading status of the third result
-                // case 4:
-                //   expect(result.loading).toBeTruthy();
-                //   expect(result.error).toBeFalsy();
-                //   break;
-                case 4:
-                  // Third result's data is loaded
-                  expect(result.loading).toBeFalsy();
-                  expect(result.error).toBeFalsy();
-                  if (!result.data) {
-                    done.fail('Should have data by this point');
-                    break;
-                  }
-                  expect(stripSymbols(result.data.allPeople)).toEqual(dataTwo.allPeople);
-                  done();
-                  break;
-                default:
-                  throw new Error('Unexpected fall through');
-              }
-            } catch (e) {
-              done.fail(e);
-            }
-            return null;
-          }}
-        </AllPeopleQuery2>
-      );
+    function useAllPeopleQuery2(props: any) {
+      return useQuery(props);
     }
 
-    wrapper = mount(
-      <ApolloProvider client={client}>
-        <Container />
-      </ApolloProvider>,
-    );
+    function Container() {
+      const result = useAllPeopleQuery2({ query, notifyOnNetworkStatusChange: true });
+      try {
+        switch (count++) {
+          case 0:
+            // Waiting for the first result to load
+            expect(result.loading).toBeTruthy();
+            break;
+          case 1:
+            if (!result.data!.allPeople) {
+              done.fail('Should have data by this point');
+              break;
+            }
+            // First result is loaded, run a refetch to get the second result
+            // which is an error.
+            expect(stripSymbols(result.data!.allPeople)).toEqual(data.allPeople);
+            setTimeout(() => {
+              result.refetch().then(() => {
+                done.fail('Expected error value on first refetch.');
+              }, noop);
+            }, 0);
+            break;
+          case 2:
+            // Waiting for the second result to load
+            expect(result.loading).toBeTruthy();
+            break;
+          case 3:
+            // The error arrived, run a refetch to get the third result
+            // which should now contain valid data.
+            expect(result.loading).toBeFalsy();
+            expect(result.error).toBeTruthy();
+            setTimeout(() => {
+              result.refetch().catch(() => {
+                done.fail('Expected good data on second refetch.');
+              });
+            }, 0);
+            break;
+          // Further fix required in QueryManager, we should have an extra
+          // step for the loading status of the third result
+          // case 4:
+          //   expect(result.loading).toBeTruthy();
+          //   expect(result.error).toBeFalsy();
+          //   break;
+          case 4:
+            // Third result's data is loaded
+            expect(result.loading).toBeFalsy();
+            expect(result.error).toBeFalsy();
+            if (!result.data) {
+              done.fail('Should have data by this point');
+              break;
+            }
+            expect(stripSymbols(result.data.allPeople)).toEqual(dataTwo.allPeople);
+            done();
+            break;
+          default:
+            throw new Error('Unexpected fall through');
+        }
+      } catch (e) {
+        done.fail(e);
+      }
+      return null;
+    }
+    const context = useProvider({ client });
+    wrapper = mount(<Container />);
   });
 
   describe('Partial refetching', () => {
@@ -1367,24 +1342,19 @@ describe('Query component', () => {
         });
 
         let count = 0;
-        const Component = () => (
-          <Query query={allPeopleQuery} partialRefetch>
-            {result => {
-              const { data, loading } = result;
-              if (!loading) {
-                expect(stripSymbols(data)).toEqual(allPeopleData);
-                done();
-              }
-              return null;
-            }}
-          </Query>
-        );
+        const Component = () => {
+          const result = useQuery({ query: allPeopleQuery, partialRefetch: true });
 
-        wrapper = mount(
-          <ApolloProvider client={client}>
-            <Component />
-          </ApolloProvider>,
-        );
+          const { data, loading } = result;
+          if (!loading) {
+            expect(stripSymbols(data)).toEqual(allPeopleData);
+            done();
+          }
+          return null;
+        };
+
+        const context = useProvider({ client });
+        wrapper = mount(<Component />);
       },
     );
 
@@ -1401,45 +1371,36 @@ describe('Query component', () => {
         });
 
         let count = 0;
-        const Component = () => (
-          <Query query={allPeopleQuery}>
-            {result => {
-              const { data, loading } = result;
-              if (!loading) {
-                expect(data).toEqual({});
-                done();
-              }
-              return null;
-            }}
-          </Query>
-        );
+        const Component = () => {
+          const result = useQuery({ query: allPeopleQuery });
+          const { data, loading } = result;
+          if (!loading) {
+            expect(data).toEqual({});
+            done();
+          }
+          return null;
+        };
 
-        wrapper = mount(
-          <ApolloProvider client={client}>
-            <Component />
-          </ApolloProvider>,
-        );
+        const context = useProvider({ client });
+        wrapper = mount(<Component />);
       },
     );
   });
 
   // https://github.com/apollographql/react-apollo/issues/2424
   it('should be able to access data keys without a type guard', () => {
-    const Component = () => (
-      <AllPeopleQuery query={allPeopleQuery}>
-        {result => {
-          if (result.data && result.data.allPeople) {
-            return null;
-          }
+    const Component = () => {
+      const result = useAllPeopleQuery({ query: allPeopleQuery });
+      if (result.data && result.data.allPeople) {
+        return null;
+      }
 
-          if (result.data && result.data!.allPeople) {
-            return null;
-          }
+      if (result.data && result.data!.allPeople) {
+        return null;
+      }
 
-          const { allPeople } = result.data!;
-          return null;
-        }}
-      </AllPeopleQuery>
-    );
+      const { allPeople } = result.data!;
+      return null;
+    };
   });
 });
