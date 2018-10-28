@@ -21,7 +21,7 @@ Get started today on the app you’ve been dreaming of, and let React Apollo tak
 
 ## Notice
 
-This fork is adding [React Hooks](https://reactjs.org/docs/hooks-intro.html) to the react apollo api. See [Hooks]([./Hooks.md]) for details.
+This fork is adding [React Hooks](https://reactjs.org/docs/hooks-intro.html) to the react apollo api. See [Hooks](./Hooks.md) for details.
 
 ## Installation
 
