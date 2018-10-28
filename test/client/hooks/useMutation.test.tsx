@@ -147,36 +147,6 @@ it('pick prop client over context client', async done => {
   }, 10);
 });
 
-it('performs a mutation', done => {
-  let count = 0;
-  const Component = () => {
-    const [result, createTodo] = useMutation({ mutation });
-    if (count === 0) {
-      expect(result.loading).toEqual(false);
-      expect(result.called).toEqual(false);
-      setTimeout(() => {
-        createTodo();
-      });
-    } else if (count === 1) {
-      expect(result.called).toEqual(true);
-      expect(result.loading).toEqual(true);
-    } else if (count === 2) {
-      expect(result.called).toEqual(true);
-      expect(result.loading).toEqual(false);
-      expect(result.data).toEqual(data);
-      done();
-    }
-    count++;
-    return <div />;
-  };
-
-  mount(
-    <MockedProvider mocks={mocks}>
-      <Component />
-    </MockedProvider>,
-  );
-});
-
 it('can bind only the mutation and not rerender by props', done => {
   let count = 0;
   const Component = () => {

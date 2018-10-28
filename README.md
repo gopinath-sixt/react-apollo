@@ -19,6 +19,10 @@ React Apollo is:
 
 Get started today on the app you’ve been dreaming of, and let React Apollo take you to the moon!
 
+## Notice
+
+This fork is adding [React Hooks](https://reactjs.org/docs/hooks-intro.html) to the react apollo api. See [Hooks]([./Hooks.md]) for details.
+
 ## Installation
 
 It is simple to install React Apollo and related libraries
